@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+.env
+data/chroma/
+data/raw/
+*.db
+.pytest_cache/
+.streamlit/
+*.log
+.DS_Store
