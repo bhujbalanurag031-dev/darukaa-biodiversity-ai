@@ -2,7 +2,7 @@ venv/
 __pycache__/
 *.pyc
 .env
-data/chroma/
+# data/chroma/
 data/raw/
 *.db
 .pytest_cache/
