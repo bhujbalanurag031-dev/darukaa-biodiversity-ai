@@ -4,9 +4,10 @@ Talks to the FastAPI backend at localhost:8000.
 """
 import streamlit as st
 import requests
+import os
 
 # ---------- Config ----------
-API_URL = "http://localhost:8000"
+API_URL = os.getenv("API_URL", "http://localhost:8000")
 TIMEOUT = 240
 
 st.set_page_config(
