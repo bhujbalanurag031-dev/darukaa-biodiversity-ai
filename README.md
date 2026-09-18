@@ -216,6 +216,26 @@ Every response conforms to a strict Pydantic schema:
 **Provider-agnostic LLM client:** Switch between Groq and OpenAI by setting `LLM_PROVIDER` in `.env`. Includes graceful fallback if JSON mode fails.
 
 ---
+## Live Demo
+
+**Frontend (Streamlit Cloud):**  
+https://darukaa-biodiversity-ai-gm4rlvxbqzg!ge5aappu4v.streamlit.app
+
+**Backend API (Render):**  
+https://darukaa-biodiversity-ai.onrender.com
+
+**API Documentation:**  
+https://darukaa-biodiversity-ai.onrender.com/docs
+
+>  **Note on free-tier limitations:** The backend runs on Render's free tier 
+> (0.1 CPU, 512 MB RAM, auto-sleep after 15 min). The reasoning pipeline requires 
+> ~650 MB RAM at peak, so `/api/chat` may return HTTP 502 due to the free-tier 
+> memory ceiling. This is a platform constraint, not a code defect. The frontend's 
+> error message explains this to end users and points to local setup instructions. 
+> All 4 screenshots in `docs/screenshots/` were captured from live local runs 
+> proving the full system works.
+
+---
 
 ##  Local Setup
 
