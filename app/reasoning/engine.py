@@ -6,10 +6,12 @@ Design principles:
 2. Always connect >= 3 environmental variables per recommendation.
 3. Always ground claims in retrieved scientific evidence.
 4. Output structured JSON with recommendation + why + metrics + horizon + confidence.
+5. Minimize memory footprint for free-tier deployment (512 MB ceiling).
 """
 import gc
 import json
 from typing import Dict, Any, List
+
 from app.reasoning.llm_client import get_llm
 from app.rag.retriever import retrieve_with_metadata, format_context
 from app.conversation.memory import add_to_history, get_conversation_history
@@ -151,6 +153,7 @@ class ReasoningEngine:
                 + "\n".join(f"• {m}" for m in missing)
             )
             add_to_history(conv_id, "assistant", response_text)
+            gc.collect()  # Memory hygiene
             return {
                 "response": response_text,
                 "recommendations": [],
@@ -165,6 +168,9 @@ class ReasoningEngine:
         retrieved = retrieve_with_metadata(query_for_retrieval, k=settings.TOP_K_RETRIEVAL)
         context = format_context(retrieved)
         sources = list({r["source"] for r in retrieved})
+
+        # Free memory used during embedding/retrieval before LLM call
+        gc.collect()
 
         # STEP 3: Build LLM prompt
         profile = self._build_profile(user_input)
@@ -199,7 +205,19 @@ class ReasoningEngine:
 
         add_to_history(conv_id, "assistant", response_text)
 
-        # Free memory after heavy processing
+        # STEP 6: Aggressive memory cleanup
+        # Drop references to large objects so Python can free them
+        del context
+        del retrieved
+        del system
+        del user_msg
+        if result.get("reasoning"):
+            # Reasoning trace can be huge (thousands of tokens)
+            result["reasoning"] = result["reasoning"][:2000]
+
+        # Force garbage collection multiple times
+        # (first pass frees objects, second pass cleans up the freed graph)
+        gc.collect()
         gc.collect()
 
         return {

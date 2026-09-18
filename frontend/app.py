@@ -1,10 +1,11 @@
 """
 Streamlit chat UI for Darukaa.Earth Biodiversity AI.
-Talks to the FastAPI backend at localhost:8000.
+Talks to the FastAPI backend via API_URL env var.
 """
 import streamlit as st
 import requests
 import os
+import json
 
 # ---------- Config ----------
 API_URL = os.getenv("API_URL", "http://localhost:8000")
@@ -32,13 +33,23 @@ if "last_result" not in st.session_state:
 # ---------- Sidebar ----------
 with st.sidebar:
     st.header("📍 Location (optional)")
-    use_location = st.checkbox("Auto-fetch environmental data from coordinates")
+    use_location = st.checkbox(
+        "Auto-fetch environmental data from coordinates",
+        key="use_location",
+    )
 
-    lat, lon = None, None
     if use_location:
-        lat = st.number_input("Latitude", value=18.52, format="%.4f", min_value=-90.0, max_value=90.0)
-        lon = st.number_input("Longitude", value=73.85, format="%.4f", min_value=-180.0, max_value=180.0)
+        lat = st.number_input(
+            "Latitude", value=18.52, format="%.4f",
+            min_value=-90.0, max_value=90.0, key="lat",
+        )
+        lon = st.number_input(
+            "Longitude", value=73.85, format="%.4f",
+            min_value=-180.0, max_value=180.0, key="lon",
+        )
         st.caption("Tip: 18.52, 73.85 = Pune, India")
+    else:
+        lat, lon = None, None
 
     st.divider()
     st.header("🌱 Environmental Profile (optional)")
@@ -46,67 +57,104 @@ with st.sidebar:
     land_use = st.selectbox(
         "Land use type",
         ["", "cropland", "degraded_cropland", "forest", "grassland", "wetland", "urban", "plantation"],
+        key="land_use",
     )
 
     st.markdown("**Soil**")
-    soil_ph = st.number_input("pH", 0.0, 14.0, 0.0, 0.1)
-    soil_soc = st.number_input("Organic carbon (%)", 0.0, 20.0, 0.0, 0.1)
-    soil_moisture = st.selectbox("Moisture level", ["", "very_dry", "dry", "optimal", "wet"])
+    soil_ph = st.number_input(
+        "pH", min_value=0.0, max_value=14.0, value=0.0, step=0.1, key="soil_ph"
+    )
+    soil_soc = st.number_input(
+        "Organic carbon (%)", min_value=0.0, max_value=20.0, value=0.0, step=0.1, key="soil_soc"
+    )
+    soil_moisture = st.selectbox(
+        "Moisture level",
+        ["", "very_dry", "dry", "optimal", "wet"],
+        key="soil_moisture",
+    )
 
     st.markdown("**Climate**")
-    rainfall = st.number_input("Annual rainfall (mm)", 0.0, 6000.0, 0.0, 10.0)
-    temp = st.number_input("Avg temperature (°C)", -10.0, 50.0, 0.0, 0.5)
+    rainfall = st.number_input(
+        "Annual rainfall (mm)", min_value=0.0, max_value=6000.0,
+        value=0.0, step=10.0, key="rainfall",
+    )
+    temp = st.number_input(
+        "Avg temperature (°C)", min_value=-10.0, max_value=50.0,
+        value=0.0, step=0.5, key="temp",
+    )
 
     st.markdown("**Biodiversity**")
-    species_richness = st.selectbox("Species richness", ["", "very_low", "low", "medium", "high"])
-    habitat_diversity = st.selectbox("Habitat diversity", ["", "very_low", "low", "medium", "high"])
+    species_richness = st.selectbox(
+        "Species richness",
+        ["", "very_low", "low", "medium", "high"],
+        key="species_richness",
+    )
+    habitat_diversity = st.selectbox(
+        "Habitat diversity",
+        ["", "very_low", "low", "medium", "high"],
+        key="habitat_diversity",
+    )
 
     st.divider()
-    show_reasoning = st.checkbox("Show reasoning trace", value=False)
+    show_reasoning = st.checkbox("Show reasoning trace", value=False, key="show_reasoning")
     if st.button("🗑️ Clear conversation"):
         st.session_state.messages = []
         st.session_state.last_result = None
         st.rerun()
 
 
+# ---------- Build payload from session state ----------
 def build_payload(query: str) -> dict:
-    payload = {"query": query, "conversation_id": st.session_state.conversation_id}
+    payload = {
+        "query": query,
+        "conversation_id": st.session_state.conversation_id,
+    }
 
-    if use_location and lat is not None and lon is not None:
-        payload["location"] = {"lat": lat, "lon": lon}
+    # Location
+    if st.session_state.get("use_location"):
+        if st.session_state.get("lat") and st.session_state.get("lon"):
+            payload["location"] = {
+                "lat": st.session_state.lat,
+                "lon": st.session_state.lon,
+            }
 
-    if land_use:
-        payload["land_use"] = land_use
+    # Land use
+    if st.session_state.get("land_use"):
+        payload["land_use"] = st.session_state.land_use
 
+    # Soil — read directly from session state (more reliable than local vars)
     soil = {}
-    if soil_ph > 0:
-        soil["ph"] = soil_ph
-    if soil_soc > 0:
-        soil["organic_carbon_pct"] = soil_soc
-    if soil_moisture:
-        soil["moisture_status"] = soil_moisture
+    if st.session_state.get("soil_ph", 0) > 0:
+        soil["ph"] = st.session_state.soil_ph
+    if st.session_state.get("soil_soc", 0) > 0:
+        soil["organic_carbon_pct"] = st.session_state.soil_soc
+    if st.session_state.get("soil_moisture"):
+        soil["moisture_status"] = st.session_state.soil_moisture
     if soil:
         payload["soil"] = soil
 
+    # Climate
     climate = {}
-    if rainfall > 0:
-        climate["rainfall_mm"] = rainfall
-    if temp != 0:
-        climate["temp_c"] = temp
+    if st.session_state.get("rainfall", 0) > 0:
+        climate["rainfall_mm"] = st.session_state.rainfall
+    if st.session_state.get("temp", 0) != 0:
+        climate["temp_c"] = st.session_state.temp
     if climate:
         payload["climate"] = climate
 
+    # Biodiversity
     biodiversity = {}
-    if species_richness:
-        biodiversity["species_richness"] = species_richness
-    if habitat_diversity:
-        biodiversity["habitat_diversity"] = habitat_diversity
+    if st.session_state.get("species_richness"):
+        biodiversity["species_richness"] = st.session_state.species_richness
+    if st.session_state.get("habitat_diversity"):
+        biodiversity["habitat_diversity"] = st.session_state.habitat_diversity
     if biodiversity:
         payload["biodiversity"] = biodiversity
 
     return payload
 
 
+# ---------- Render recommendation card ----------
 def render_recommendation(idx: int, rec: dict):
     title_preview = rec.get("recommendation", "")[:90]
     with st.expander(f"**Recommendation {idx}:** {title_preview}..."):
@@ -169,10 +217,19 @@ if prompt := st.chat_input("Describe your environmental concern..."):
         st.markdown(prompt)
 
     payload = build_payload(prompt)
+
+    # Show what's being sent (helpful for debugging)
+    with st.expander("🔍 Request payload (debug)", expanded=False):
+        st.json(payload)
+
     with st.chat_message("assistant"):
         with st.spinner("Analyzing environmental data and retrieving scientific evidence..."):
             try:
-                r = requests.post(f"{API_URL}/api/chat", json=payload, timeout=TIMEOUT)
+                r = requests.post(
+                    f"{API_URL}/api/chat",
+                    json=payload,
+                    timeout=TIMEOUT,
+                )
                 r.raise_for_status()
                 data = r.json()
 
@@ -194,7 +251,7 @@ if prompt := st.chat_input("Describe your environmental concern..."):
                         for s in sources:
                             st.markdown(f"- `{s}`")
 
-                if show_reasoning and data.get("reasoning_trace"):
+                if st.session_state.get("show_reasoning") and data.get("reasoning_trace"):
                     with st.expander("🧠 Reasoning trace (scientific thinking)"):
                         st.text(data["reasoning_trace"])
 
@@ -206,12 +263,47 @@ if prompt := st.chat_input("Describe your environmental concern..."):
                 })
                 st.session_state.last_result = data
 
-            except requests.exceptions.ConnectionError:
+            except requests.exceptions.ConnectionError as e:
                 st.error(
-                    "❌ Cannot reach the API. Is uvicorn running?\n\n"
-                    "Open another terminal and run: `uvicorn app.main:app --reload --port 8000`"
+                    f"❌ **Cannot reach the backend at `{API_URL}`**\n\n"
+                    "Possible causes:\n"
+                    "- The backend service is asleep (Render free tier) — wait 60s and try again\n"
+                    "- The backend crashed due to memory limits (512 MB on free tier)\n"
+                    "- Wrong `API_URL` in Streamlit Cloud secrets\n\n"
+                    "**If this is the deployed demo:** the free-tier backend is insufficient for "
+                    "the embedding model + vector DB. See the project README for local setup, "
+                    "which runs the full system."
                 )
+                st.info(
+                    "💡 **Tip:** The system works reliably when run locally. "
+                    "Clone the repo and follow the Local Setup instructions in the README."
+                )
+
             except requests.exceptions.Timeout:
-                st.error("⏱️ Request timed out. The reasoning engine can take 1–2 minutes.")
+                st.error(
+                    "⏱️ **Request timed out after 240 seconds.**\n\n"
+                    "This is expected on the free-tier backend, which has only 0.1 CPU and 512 MB RAM. "
+                    "The reasoning engine needs ~500 MB just for the embedding model and vector store.\n\n"
+                    "For the full experience, run locally — see the README."
+                )
+
+            except requests.exceptions.HTTPError as e:
+                status = e.response.status_code if e.response is not None else "unknown"
+                st.error(
+                    f"❌ **Backend returned HTTP {status}**\n\n"
+                    f"URL: `{API_URL}/api/chat`\n\n"
+                    "**If this is 502 Bad Gateway:** the backend was killed mid-request — "
+                    "most likely due to the 512 MB memory limit on Render's free tier. "
+                    "This is a known platform constraint for ML workloads.\n\n"
+                    "The system runs fully locally — see the README for setup instructions."
+                )
+                st.info(
+                    "📸 Screenshots of the working system are available in the "
+                    "GitHub repository under `docs/screenshots/`."
+                )
+
+            except json.JSONDecodeError:
+                st.error("❌ Backend returned invalid JSON. The LLM may have generated malformed output. Try again.")
+
             except Exception as e:
-                st.error(f"❌ Error: {type(e).__name__}: {e}")
+                st.error(f"❌ Unexpected error: `{type(e).__name__}: {e}`")
