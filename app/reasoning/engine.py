@@ -7,6 +7,7 @@ Design principles:
 3. Always ground claims in retrieved scientific evidence.
 4. Output structured JSON with recommendation + why + metrics + horizon + confidence.
 """
+import gc
 import json
 from typing import Dict, Any, List
 from app.reasoning.llm_client import get_llm
@@ -197,6 +198,9 @@ class ReasoningEngine:
         follow_ups = parsed.get("follow_up_questions", [])
 
         add_to_history(conv_id, "assistant", response_text)
+
+        # Free memory after heavy processing
+        gc.collect()
 
         return {
             "response": response_text,
