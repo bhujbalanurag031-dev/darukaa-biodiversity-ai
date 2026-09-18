@@ -3,7 +3,7 @@
 
 **An AI environmental scientist that reasons about real-world environmental problems with grounded, evidence-backed recommendations.**
 
-**🌐 Live Frontend:** https://darukaa-biodiversity-ai-gm4rlvxbqzg!ge5aappu4v.streamlit.app
+**🌐 Live Frontend:** https://darukaa-biodiversity-ai-gm4rlvxbaqzglge5aappu4v.streamlit.app/
 
 **📦 GitHub Repo:** https://github.com/bhujbalanurag031-dev/darukaa-biodiversity-ai
 
